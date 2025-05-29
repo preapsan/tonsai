@@ -1,6 +1,200 @@
-<div id="target"></div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Alphabet Drawing App</title>
+<style>
+  body {
+    font-family: 'Comic Sans MS', cursive, sans-serif;
+    background: #ff8fff; /* Fixed hex code */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0; /* Fixed empty margin */
+    padding: 20px;
+  }
+  h1 {
+    color: #2a7ae2;
+  }
+  #drawing-area {
+    position: relative;
+    width: 320px;
+    height: 400px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); /* Fixed rgba syntax */
+    margin-top: 20px;
+  }
+  svg {
+    width: 100%;
+    height: 100%;
+  }
+  .path {
+    fill: none;
+    stroke: #bbb;
+    stroke-width: 8;
+    stroke-dasharray: 8 8;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+  .drawn-path {
+    fill: none;
+    stroke: #2a7ae2;
+    stroke-width: 8;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+  #next-btn {
+    margin-top: 20px;
+    background-color: #2a7ae2;
+    border: none;
+    color: white;
+    padding: 12px 28px;
+    font-size: 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    user-select: none;
+  }
+  #next-btn:disabled {
+    background-color: #abff99; /* Fixed invalid color */
+    cursor: not-allowed;
+  }
+  #progress-bar {
+    width: 320px;
+    height: 12px;
+    background: #ddd;
+    border-radius: 6px;
+    margin-top: 12px;
+    overflow: hidden;
+  }
+  #progress-fill {
+    height: 100%;
+    background: #2a7ae2;
+    width: 0%; /* Fixed initial value */
+    transition: width .2s ease;
+  }
+</style>
+</head>
+<body>
+<h1>Draw the Letter A</h1>
+<div id="drawing-area">
+  <svg viewBox="0 0 200 260" id="svg"> <!-- Fixed viewBox format -->
+    <!-- Dotted path for letter A -->
+    <path id="path" class="path" d="M50 230 L100 30 L150 230 M75 130 L125 130" />
+    <!-- User drawn path -->
+    <path id="drawn" class="drawn-path" d="" />
+  </svg>
+</div>
+<div id="progress-bar">
+  <div id="progress-fill"></div>
+</div>
+<button id="next-btn" disabled>Next</button>
 
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-  $('#target').load('https://cambonomist.com .page');
+  const svg = document.getElementById('svg');
+  const path = document.getElementById('path');
+  const drawn = document.getElementById('drawn');
+  const progressFill = document.getElementById('progress-fill');
+  const nextBtn = document.getElementById('next-btn');
+
+  const pathLength = path.getTotalLength();
+
+  let isDrawing = false;
+  let drawnLength = 0; // Fixed: was missing
+  let userPathPoints = [];
+
+  function getPoint(event) {
+    const rect = svg.getBoundingClientRect();
+    let clientX, clientY;
+    if (event.touches) {
+      clientX = event.touches[0].clientX; // Fixed: event.touches[] to event.touches[0]
+      clientY = event.touches[0].clientY;
+    } else {
+      clientX = event.clientX;
+      clientY = event.clientY;
+    }
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top
+    };
+  }
+
+  function isNearPath(point, maxDistance = 15) {
+    let closestDistance = Infinity;
+    let closestLength = 0; // Fixed: was empty
+    const sampleCount = 100;
+    for (let i = 0; i <= sampleCount; i++) { // Fixed: loop start value
+      const len = (i / sampleCount) * pathLength;
+      const pos = path.getPointAtLength(len);
+      const dx = pos.x - point.x;
+      const dy = pos.y - point.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < closestDistance) {
+        closestDistance = dist;
+        closestLength = len;
+      }
+    }
+    return { near: closestDistance <= maxDistance, length: closestLength };
+  }
+
+  function startDraw(event) {
+    event.preventDefault();
+    const point = getPoint(event);
+    const nearCheck = isNearPath(point);
+    if (nearCheck.near) {
+      isDrawing = true;
+      userPathPoints = [`M${point.x},${point.y}`];
+      drawnLength = nearCheck.length;
+      updateProgress(drawnLength);
+      drawn.setAttribute('d', userPathPoints.join(' '));
+    }
+  }
+
+  function draw(event) {
+    if (!isDrawing) return;
+    event.preventDefault();
+    const point = getPoint(event);
+    const nearCheck = isNearPath(point);
+    if (nearCheck.near && nearCheck.length >= drawnLength) {
+      drawnLength = nearCheck.length;
+      userPathPoints.push(`L${point.x},${point.y}`);
+      drawn.setAttribute('d', userPathPoints.join(' '));
+      updateProgress(drawnLength);
+      if (drawnLength >= pathLength * 0.95) {
+        isDrawing = false;
+        nextBtn.disabled = false;
+      }
+    }
+  }
+
+  function endDraw(event) {
+    if (isDrawing) {
+      isDrawing = false;
+    }
+  }
+
+  function updateProgress(length) {
+    const percent = (length / pathLength) * 100;
+    progressFill.style.width = percent + '%';
+  }
+
+  svg.addEventListener('mousedown', startDraw);
+  svg.addEventListener('touchstart', startDraw);
+
+  svg.addEventListener('mousemove', draw);
+  svg.addEventListener('touchmove', draw);
+
+  svg.addEventListener('mouseup', endDraw);
+  svg.addEventListener('touchend', endDraw);
+  svg.addEventListener('touchcancel', endDraw);
+
+  nextBtn.addEventListener('click', () => {
+    alert('Great job! Ready for the next letter.');
+    drawn.setAttribute('d', '');
+    progressFill.style.width = '0%'; // Fixed reset value
+    nextBtn.disabled = true;
+  });
 </script>
+</body>
+</html>
